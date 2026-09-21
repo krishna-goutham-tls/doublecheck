@@ -1,0 +1,13 @@
+{
+  "name": "doublecheck",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "doublecheck": "./src/cli.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "last": "node ./src/cli.mjs last"
+  }
+}

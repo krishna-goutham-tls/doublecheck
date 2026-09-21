@@ -36,7 +36,7 @@ export function decide(answers) {
   if (type !== "none" && looked < YES) reasons.push("looked")
   if (invented >= YES) reasons.push("invented")
   return {
-    light: reasons.length ? "PROBE" : "FINE",
+    light: reasons.length ? "REPROBE" : "FINE",
     type,
     looked,
     invented,

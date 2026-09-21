@@ -1,8 +1,10 @@
 # doublecheck
 
-Read the last Claude Code turn. Print `PROBE` or `FINE`.
+After each Claude Code or Grok Build turn, show `REPROBE` or `FINE`.
 
-Today this reads Claude Code only. It does not run inside Factory Droid, Codex, or Grok Build.
+`REPROBE` means read the reply again and send the prompt back. `FINE` means leave it. The hook does not tell the model to change the answer.
+
+Codex and Factory Droid are not wired.
 
 ```sh
 node src/cli.mjs last

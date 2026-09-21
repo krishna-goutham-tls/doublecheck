@@ -1,8 +1,10 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { lastTurnFromJsonl } from "../src/claude.mjs"
+import { lastTurnFromCodex } from "../src/codex.mjs"
 import { shouldRun } from "../src/gate.mjs"
 import { lastTurnFromGrok } from "../src/grok.mjs"
+import { upsertDroid, upsertWrapped } from "../src/install.mjs"
 import { decide } from "../src/light.mjs"
 
 test("REPROBE when they looked and still invented", () => {
@@ -78,6 +80,53 @@ test("grok turn uses the user query, not the wrapper", () => {
   assert.equal(turn.user, "what does AGENTS.md say?")
   assert.match(turn.tools, /read_file AGENTS.md/)
   assert.equal(turn.answer, "It is a router.")
+})
+
+test("codex turn keeps the user text and the command", () => {
+  const jsonl = [
+    JSON.stringify({
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "<environment_context><cwd>/tmp</cwd></environment_context>\nfix the login bug" }],
+      },
+    }),
+    JSON.stringify({
+      type: "response_item",
+      payload: { type: "function_call", name: "exec_command", call_id: "c1", arguments: JSON.stringify({ cmd: "cat src/login.ts" }) },
+    }),
+    JSON.stringify({
+      type: "response_item",
+      payload: { type: "function_call_output", call_id: "c1", output: "export function login() {}" },
+    }),
+    JSON.stringify({
+      type: "response_item",
+      payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "Fixed." }] },
+    }),
+  ].join("\n")
+  const turn = lastTurnFromCodex(jsonl)
+  assert.equal(turn.user, "fix the login bug")
+  assert.match(turn.tools, /exec_command/)
+  assert.equal(turn.answer, "Fixed.")
+})
+
+test("install keeps an existing stop hook", () => {
+  const config = upsertWrapped(
+    { hooks: { Stop: [{ hooks: [{ type: "command", command: "/Users/kg/claude-notch/launch.sh" }] }] } },
+    { hooks: [{ type: "command", command: "node /Users/me/.doublecheck/runtime/src/hook.mjs", timeout: 30 }] },
+  )
+  assert.equal(config.hooks.Stop.length, 2)
+  assert.match(config.hooks.Stop[0].hooks[0].command, /claude-notch/)
+  const again = upsertWrapped(config, {
+    hooks: [{ type: "command", command: "node /Users/me/.doublecheck/runtime/src/hook.mjs", timeout: 30 }],
+  })
+  assert.equal(again.hooks.Stop.length, 2)
+})
+
+test("droid file uses a top-level Stop list", () => {
+  const config = upsertDroid({}, { hooks: [{ type: "command", command: "node /Users/me/.doublecheck/runtime/src/hook.mjs" }] })
+  assert.equal(config.Stop.length, 1)
 })
 
 function row(role, content) {

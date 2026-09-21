@@ -1,4 +1,5 @@
 import { readdirSync, statSync } from "node:fs"
+import { visibleUserText } from "./text.mjs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 
@@ -100,8 +101,7 @@ function userText(content) {
       .map((part) => part.text || "")
       .join("\n")
   }
-  const match = text.match(/<user_query>\s*([\s\S]*?)\s*<\/user_query>/)
-  return (match ? match[1] : text).trim()
+  return visibleUserText(text)
 }
 
 function parseArgs(value) {

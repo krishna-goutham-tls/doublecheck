@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { readFileSync, existsSync } from "node:fs"
 import { spawn } from "node:child_process"
+import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { lastTurnFromJsonl } from "./claude.mjs"
+import { lastTurnFromCodex } from "./codex.mjs"
 import { grokHistoryFile, lastTurnFromGrok } from "./grok.mjs"
 import { shouldRun } from "./gate.mjs"
 import { judge } from "./jev.mjs"
@@ -49,6 +51,8 @@ function turnFromHook(input) {
     const text = readFileSync(transcript, "utf8")
     const claude = lastTurnFromJsonl(text)
     if (claude) return claude
+    const codex = lastTurnFromCodex(text)
+    if (codex) return codex
     const grok = lastTurnFromGrok(text)
     if (grok) return grok
   }
@@ -81,7 +85,11 @@ function isGrok() {
 }
 
 function loadEnvLocal() {
-  const file = join(dirname(fileURLToPath(import.meta.url)), "..", ".env.local")
+  loadEnvFile(join(homedir(), ".doublecheck", ".env.local"))
+  loadEnvFile(join(dirname(fileURLToPath(import.meta.url)), "..", ".env.local"))
+}
+
+function loadEnvFile(file) {
   if (!existsSync(file)) return
   for (const line of readFileSync(file, "utf8").split("\n")) {
     const trimmed = line.trim()

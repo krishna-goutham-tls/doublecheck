@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, statSync } from "node:fs"
+import { visibleUserText } from "./text.mjs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 
@@ -56,12 +57,14 @@ export function lastTurnFromJsonl(text) {
     const content = message.content
     if (message.role === "user") {
       if (typeof content === "string" && content.trim()) {
-        events.push({ kind: "user", text: cleanUser(content) })
+        const user = cleanUser(content)
+        if (user) events.push({ kind: "user", text: user })
       } else if (Array.isArray(content)) {
         const texts = content
           .filter((part) => part && part.type === "text" && part.text)
           .map((part) => part.text)
-        if (texts.length) events.push({ kind: "user", text: cleanUser(texts.join("\n")) })
+        const user = texts.length ? cleanUser(texts.join("\n")) : ""
+        if (user) events.push({ kind: "user", text: user })
         for (const part of content) {
           if (part && part.type === "tool_result") {
             events.push({
@@ -124,7 +127,7 @@ export function readLastTurn(file) {
 }
 
 function cleanUser(text) {
-  return text.replace(/^\s*<!-- reply -->\s*/i, "").trim()
+  return visibleUserText(text)
 }
 
 function summarizeInput(input) {

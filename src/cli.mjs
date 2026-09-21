@@ -3,14 +3,22 @@ import { readFileSync, existsSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { latestSessionFile, readLastTurn } from "./claude.mjs"
+import { install } from "./install.mjs"
 import { judge } from "./jev.mjs"
 import { decide } from "./light.mjs"
 
 loadEnvLocal()
 
 const command = process.argv[2] || "last"
+if (command === "install") {
+  const result = await install()
+  console.log("Installed. Start a new session in each tool.")
+  for (const file of result.wired) console.log(file)
+  console.log(result.saved === "missing" ? `Add your TypeSafe key to ${result.keyFile}` : `Key ${result.saved}.`)
+  process.exit(0)
+}
 if (command !== "last") {
-  console.error("Usage: doublecheck last [--file path]")
+  console.error("Usage: doublecheck install | doublecheck last [--file path]")
   process.exit(2)
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "doublecheck-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "After a turn in Claude Code, Grok Build, Codex, or Factory Droid, print REPROBE in that session when a required look was missed.",
   "license": "MIT",
   "repository": {

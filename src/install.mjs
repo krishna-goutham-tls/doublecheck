@@ -83,7 +83,7 @@ async function ensureKey(keyFile, packageSrc, options) {
   const fromEnv = process.env.TYPESAFE_API_KEY
   let key = fromEnv || fromPackage || ""
   if (!key && options.ask !== false && process.stdin.isTTY) {
-    key = (await ask("TypeSafe API key: ")).trim()
+    key = (await ask("Paste your TypeSafe API key in this terminal only: ")).trim()
   }
   if (!key) return "missing"
   writeFileSync(keyFile, `TYPESAFE_API_KEY=${key}\n`, { mode: 0o600 })

@@ -21,7 +21,7 @@ The installer copies the checker to `~/.doublecheck` and registers a Stop hook i
 - `~/.codex/hooks.json`
 - `~/.factory/hooks.json`
 
-It then asks for the TypeSafe API key. That is the key Jev runs on. Paste it at the prompt. The installer writes one line to `~/.doublecheck/.env.local`:
+Run the command in a normal terminal, such as Ghostty or Terminal. The installer asks for the TypeSafe API key right there. Paste the key at that prompt. It is saved only in `~/.doublecheck/.env.local` on your Mac. A Claude, Grok, Codex, or Droid chat stores what you paste into it, so paste the key in the terminal only. The characters stay visible in that terminal window until you close it.
 
 ```
 TYPESAFE_API_KEY=your-key-here

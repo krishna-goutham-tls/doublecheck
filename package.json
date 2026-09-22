@@ -1,5 +1,5 @@
 {
-  "name": "doublecheck",
+  "name": "@krishna-goutham-tls/doublecheck",
   "version": "0.1.0",
   "description": "After a turn in Claude Code, Grok Build, Codex, or Factory Droid, print REPROBE in that session when a required look was missed.",
   "license": "MIT",
@@ -9,7 +9,7 @@
   },
   "type": "module",
   "bin": {
-    "doublecheck": "./src/cli.mjs"
+    "doublecheck": "src/cli.mjs"
   },
   "files": [
     "src",

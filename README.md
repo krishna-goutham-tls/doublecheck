@@ -9,10 +9,10 @@ The check looks at the prompt, the tools that ran, and the answer. It does not r
 ## Install
 
 ```sh
-npx github:krishna-goutham-tls/doublecheck install
+npx @krishna-goutham-tls/doublecheck install
 ```
 
-That one command installs the hooks. After the package is on npm, the short command is `npx doublecheck install`. The short name is not live yet. This Mac is not logged into npm, so the package has not been published.
+npm will not give this package the bare name `doublecheck`. That name is too close to packages already called `DoubleCheck` and `double-check`. The install command uses your npm username.
 
 The installer copies the checker to `~/.doublecheck` and registers a Stop hook in four places:
 

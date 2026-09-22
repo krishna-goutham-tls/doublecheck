@@ -9,10 +9,10 @@ The check looks at the prompt, the tools that ran, and the answer. It does not r
 ## Install
 
 ```sh
-npx @krishna-goutham-tls/doublecheck install
+npx doublecheck-cli install
 ```
 
-npm will not give this package the bare name `doublecheck`. That name is too close to packages already called `DoubleCheck` and `double-check`. The install command uses your npm username.
+The bare name `doublecheck` is too close to packages already called `DoubleCheck` and `double-check`. The install name is `doublecheck-cli`. The command it installs is still `doublecheck`.
 
 The installer copies the checker to `~/.doublecheck` and registers a Stop hook in four places:
 

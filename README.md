@@ -1,38 +1,41 @@
 # doublecheck
 
-After every turn in Claude Code, Grok Build, Codex, and Factory Droid, you get one label.
+After a turn in Claude Code, Grok Build, Codex, or Factory Droid, a missed check prints one line in that session.
 
-`REPROBE` means read that reply again and send the prompt back. `FINE` means leave it.
+`REPROBE` means read that reply again and send the prompt back. A clean turn prints nothing.
 
 The check looks at the prompt, the tools that ran, and the answer. It does not rewrite the answer. It does not tell the agent to keep going.
 
 ## Install
 
 ```sh
-npx doublecheck install
+npx github:krishna-goutham-tls/doublecheck install
 ```
 
-The installer registers a Stop hook in four places:
+That one command installs the hooks. After the package is on npm, the short command is `npx doublecheck install`. The short name is not live yet. This Mac is not logged into npm, so the package has not been published.
+
+The installer copies the checker to `~/.doublecheck` and registers a Stop hook in four places:
 
 - `~/.claude/settings.json`
 - `~/.grok/hooks/doublecheck.json`
 - `~/.codex/hooks.json`
 - `~/.factory/hooks.json`
 
-It copies the checker to `~/.doublecheck` and asks for a TypeSafe API key. The key stays in `~/.doublecheck/.env.local`. Each check is billed to that key.
+It then asks for the TypeSafe API key. That is the key Jev runs on. Paste it at the prompt. The installer writes one line to `~/.doublecheck/.env.local`:
 
-Start a new session in each tool. This session will not show the label until you do.
+```
+TYPESAFE_API_KEY=your-key-here
+```
 
-On a Mac you also get a notification. Claude Code, Codex, and Factory Droid show the label in the session. Grok Build shows it as a hook line.
+Each check is billed to that key. To set the key later, put that same line in that file. Mode on the file should be readable only by you.
 
-## What the label means
+Start a new session in each tool. The session you already have open will not show the line until you do.
 
-| Label | What happened |
-|---|---|
-| `REPROBE` | The turn needed a source and did not open it, or the answer added a name, label, or number the tools do not support. |
-| `FINE` | The required look happened, or the prompt did not need one. |
+A miss above 0.85 says `Definitely reprobe.` A miss above 0.5 says `Probably reprobe.` The next sentence is fixed, in plain speech. No second model call writes it. The line shows in the session that produced the turn. Claude Code also sets that window title and rings the terminal bell. There is no macOS notification.
 
-Ask types are `none`, `code`, `docs`, `system`, and `web`. A new file or a general question is `none`. A question about existing source is `code`. A question about a markdown file is `docs`. A question about a running machine or service is `system`. A question about a current vendor API is `web`.
+## What the line means
+
+A place is `code`, `docs`, `web`, or `system`. The ask marks each place required or not. A required place that was not opened prints REPROBE. An optional miss stays silent. An answer that adds a name, label, or number the tools do not support also prints REPROBE. A score near 0.5 stays silent.
 
 ## Check one session by hand
 
@@ -41,6 +44,3 @@ doublecheck last
 doublecheck last --file /path/to/session.jsonl
 ```
 
-## Publish note
-
-`npx doublecheck install` works after this package is on npm. Until then, clone the repo and run `node src/cli.mjs install`.

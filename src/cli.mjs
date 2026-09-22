@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url"
 import { latestSessionFile, readLastTurn } from "./claude.mjs"
 import { install } from "./install.mjs"
 import { judge } from "./jev.mjs"
-import { decide } from "./light.mjs"
+import { PLACES, decide, reportLine } from "./light.mjs"
 
 loadEnvLocal()
 
@@ -43,11 +43,18 @@ if (!apiKey) {
 
 const answers = await judge(turn, apiKey)
 const result = decide(answers)
-const looked = result.looked.toFixed(2)
-const invented = result.invented.toFixed(2)
-console.log(result.light)
-console.log(`${result.type} · looked ${looked} · invented ${invented}`)
-if (result.reasons.length) console.log(result.reasons.join(", "))
+const sentence = reportLine(result)
+if (sentence) console.log(sentence)
+else console.log(result.light)
+for (const place of PLACES) {
+  const row = result.places[place]
+  console.log(`${place} required ${fmt(row.required)} looked ${fmt(row.looked)}`)
+}
+console.log(`invented ${fmt(result.invented)}`)
+
+function fmt(value) {
+  return typeof value === "number" ? value.toFixed(2) : "missing"
+}
 
 function loadEnvLocal() {
   const file = join(dirname(fileURLToPath(import.meta.url)), "..", ".env.local")

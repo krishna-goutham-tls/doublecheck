@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { readFileSync, existsSync } from "node:fs"
-import { spawn } from "node:child_process"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -9,7 +8,7 @@ import { lastTurnFromCodex } from "./codex.mjs"
 import { grokHistoryFile, lastTurnFromGrok } from "./grok.mjs"
 import { shouldRun } from "./gate.mjs"
 import { judge } from "./jev.mjs"
-import { decide } from "./light.mjs"
+import { decide, hookPayload } from "./light.mjs"
 
 loadEnvLocal()
 
@@ -28,19 +27,16 @@ if (!turn) process.exit(0)
 
 const apiKey = process.env.TYPESAFE_API_KEY
 if (!apiKey) {
-  show("doublecheck: no TYPESAFE_API_KEY", isGrok())
+  writePayload({ systemMessage: "doublecheck: no TYPESAFE_API_KEY" })
   process.exit(0)
 }
 
 try {
   const result = decide(await judge(turn, apiKey))
-  const line = [
-    `doublecheck: ${result.light}`,
-    `${result.type} · looked ${result.looked.toFixed(2)} · invented ${result.invented.toFixed(2)}`,
-  ].join("\n")
-  show(line, isGrok())
+  const payload = hookPayload(result, { ...input, grok: isGrok() })
+  if (payload) writePayload(payload)
 } catch (error) {
-  show(`doublecheck: check failed`, isGrok())
+  writePayload({ systemMessage: "doublecheck: check failed" })
   console.error(String(error.message || error).slice(0, 200))
 }
 process.exit(0)
@@ -62,22 +58,8 @@ function turnFromHook(input) {
   return null
 }
 
-function show(line, grok) {
-  notify(line)
-  if (grok) {
-    console.error(line)
-    return
-  }
-  process.stdout.write(`${JSON.stringify({ systemMessage: line })}\n`)
-}
-
-function notify(line) {
-  const [title, ...rest] = line.split("\n")
-  const body = rest.join(" ").replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-  const safeTitle = title.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-  const script = `display notification "${body}" with title "${safeTitle}"`
-  const child = spawn("osascript", ["-e", script], { stdio: "ignore", detached: true })
-  child.unref()
+function writePayload(payload) {
+  process.stdout.write(`${JSON.stringify(payload)}\n`)
 }
 
 function isGrok() {

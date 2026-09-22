@@ -5,35 +5,152 @@ import { lastTurnFromCodex } from "../src/codex.mjs"
 import { shouldRun } from "../src/gate.mjs"
 import { lastTurnFromGrok } from "../src/grok.mjs"
 import { upsertDroid, upsertWrapped } from "../src/install.mjs"
-import { decide } from "../src/light.mjs"
+import { claudeTerminalSequence, decide, hookPayload, reportLine } from "../src/light.mjs"
 
-test("REPROBE when they looked and still invented", () => {
-  const result = decide({
-    ask_type: { choice: "docs" },
-    looked: { noul: 0.8 },
-    invented: { noul: 0.89 },
-  })
-  assert.equal(result.light, "REPROBE")
-  assert.deepEqual(result.reasons, ["invented"])
+function answers(overrides = {}) {
+  const base = {}
+  for (const place of ["code", "docs", "web", "system"]) {
+    base[`${place}_required`] = { noul: 0.1 }
+    base[`${place}_looked`] = { noul: 0.1 }
+  }
+  base.invented = { noul: 0.03 }
+  return { ...base, ...overrides }
+}
+
+test("a strong look and a low invented score stay FINE", () => {
+  const result = decide(
+    answers({
+      code_required: { noul: 0.9 },
+      code_looked: { noul: 0.81 },
+      invented: { noul: 0.03 },
+    }),
+  )
+  assert.equal(result.light, "FINE")
+  assert.deepEqual(result.reasons, [])
 })
 
-test("FINE on none even if nothing was opened", () => {
-  const result = decide({
-    ask_type: { choice: "none" },
-    looked: { noul: 0.2 },
-    invented: { noul: 0.03 },
-  })
+test("a clear miss is definitely reprobe", () => {
+  const result = decide(
+    answers({
+      code_required: { noul: 0.9 },
+      code_looked: { noul: 0.1 },
+    }),
+  )
+  assert.equal(result.light, "REPROBE")
+  assert.equal(result.tone, "definitely")
+  assert.deepEqual(result.reasons.map((reason) => reason.kind), ["code"])
+})
+
+test("a softer miss is probably reprobe", () => {
+  const result = decide(
+    answers({
+      code_required: { noul: 0.9 },
+      code_looked: { noul: 0.2 },
+    }),
+  )
+  assert.equal(result.tone, "probably")
+  assert.equal(
+    reportLine(result),
+    "Probably reprobe. It probably needed the code, and I don't see it opened.",
+  )
+})
+
+test("a look at 0.5 stays silent", () => {
+  const result = decide(
+    answers({
+      docs_required: { noul: 0.9 },
+      docs_looked: { noul: 0.5 },
+    }),
+  )
   assert.equal(result.light, "FINE")
 })
 
-test("REPROBE when code was not opened", () => {
-  const result = decide({
-    ask_type: { choice: "code" },
-    looked: { noul: 0.1 },
-    invented: { noul: 0.1 },
-  })
-  assert.equal(result.light, "REPROBE")
-  assert.deepEqual(result.reasons, ["looked"])
+test("a coin-flip requirement stays silent", () => {
+  const result = decide(
+    answers({
+      web_required: { noul: 0.5 },
+      web_looked: { noul: 0.0 },
+    }),
+  )
+  assert.equal(result.light, "FINE")
+})
+
+test("an optional miss stays silent", () => {
+  const result = decide(
+    answers({
+      system_required: { noul: 0.2 },
+      system_looked: { noul: 0.0 },
+    }),
+  )
+  assert.equal(result.light, "FINE")
+})
+
+test("invented above 0.85 is definite and above 0.5 is probable", () => {
+  const sure = decide(answers({ invented: { noul: 0.86 } }))
+  assert.equal(sure.tone, "definitely")
+  assert.equal(
+    reportLine(sure),
+    "Definitely reprobe. It put in a name or a number that isn't in what it opened.",
+  )
+  const maybe = decide(answers({ invented: { noul: 0.7 } }))
+  assert.equal(maybe.tone, "probably")
+  const edge = decide(answers({ invented: { noul: 0.5 } }))
+  assert.equal(edge.light, "FINE")
+})
+
+test("two required misses both show, and an optional miss does not", () => {
+  const result = decide(
+    answers({
+      docs_required: { noul: 0.91 },
+      docs_looked: { noul: 0.1 },
+      web_required: { noul: 0.8 },
+      web_looked: { noul: 0.0 },
+      code_required: { noul: 0.2 },
+      code_looked: { noul: 0.0 },
+    }),
+  )
+  assert.deepEqual(
+    result.reasons.map((reason) => reason.kind),
+    ["docs", "web"],
+  )
+  assert.equal(result.tone, "definitely")
+  assert.match(reportLine(result), /never opened them/)
+  assert.match(reportLine(result), /I don't see a search/)
+})
+
+test("the session line names the folder and the place", () => {
+  const result = decide(
+    answers({
+      docs_required: { noul: 0.9 },
+      docs_looked: { noul: 0.1 },
+    }),
+  )
+  assert.equal(
+    reportLine(result),
+    "Definitely reprobe. It needed the notes in the project, and it never opened them.",
+  )
+  assert.equal(reportLine(decide(answers())), null)
+})
+
+test("Claude gets a title and a bell, Codex and Grok get the line only", () => {
+  const result = decide(
+    answers({
+      code_required: { noul: 0.9 },
+      code_looked: { noul: 0.1 },
+    }),
+  )
+  const claude = hookPayload(result, { cwd: "/repo/doublecheck" })
+  assert.equal(
+    claude.systemMessage,
+    "Definitely reprobe. It needed the code, and it never opened it.",
+  )
+  assert.equal(claude.terminalSequence, claudeTerminalSequence("Definitely reprobe"))
+  assert.doesNotMatch(claude.terminalSequence, /\]9;|\]777/)
+  const codex = hookPayload(result, { cwd: "/repo/doublecheck", turn_id: "t1" })
+  assert.equal(codex.terminalSequence, undefined)
+  const grok = hookPayload(result, { cwd: "/repo/doublecheck", grok: true })
+  assert.equal(grok.terminalSequence, undefined)
+  assert.equal(hookPayload(decide(answers()), { cwd: "/repo/doublecheck" }), null)
 })
 
 test("last user turn is the one after earlier turns", () => {

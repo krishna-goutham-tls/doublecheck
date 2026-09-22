@@ -9,6 +9,7 @@ import { grokHistoryFile, lastTurnFromGrok } from "./grok.mjs"
 import { shouldRun } from "./gate.mjs"
 import { judge } from "./jev.mjs"
 import { decide, hookPayload } from "./light.mjs"
+import { lookedFromTools } from "./looked.mjs"
 
 loadEnvLocal()
 
@@ -32,7 +33,8 @@ if (!apiKey) {
 }
 
 try {
-  const result = decide(await judge(turn, apiKey))
+  const looked = lookedFromTools(turn.tools)
+  const result = decide(await judge({ ...turn, looked }, apiKey), looked)
   const payload = hookPayload(result, { ...input, grok: isGrok() })
   if (payload) writePayload(payload)
 } catch (error) {

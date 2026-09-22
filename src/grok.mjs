@@ -115,7 +115,7 @@ function parseArgs(value) {
 }
 
 function summarizeInput(input) {
-  const keys = ["target_file", "file_path", "path", "command", "pattern", "url", "query"]
+  const keys = ["target_file", "file_path", "path", "command", "pattern", "url", "query", "skill"]
   const bits = []
   for (const key of keys) {
     if (input[key]) bits.push(String(input[key]).replace(/\s+/g, " ").slice(0, 180))

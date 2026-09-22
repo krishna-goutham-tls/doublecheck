@@ -6,6 +6,7 @@ import { latestSessionFile, readLastTurn } from "./claude.mjs"
 import { install } from "./install.mjs"
 import { judge } from "./jev.mjs"
 import { PLACES, decide, reportLine } from "./light.mjs"
+import { lookedFromTools } from "./looked.mjs"
 
 loadEnvLocal()
 
@@ -41,8 +42,9 @@ if (!apiKey) {
   process.exit(2)
 }
 
-const answers = await judge(turn, apiKey)
-const result = decide(answers)
+const looked = lookedFromTools(turn.tools)
+const answers = await judge({ ...turn, looked }, apiKey)
+const result = decide(answers, looked)
 const sentence = reportLine(result)
 if (sentence) console.log(sentence)
 else console.log(result.light)

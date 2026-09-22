@@ -11,43 +11,34 @@ function answers(overrides = {}) {
   const base = {}
   for (const place of ["code", "docs", "web", "system"]) {
     base[`${place}_required`] = { noul: 0.1 }
-    base[`${place}_looked`] = { noul: 0.1 }
   }
   base.invented = { noul: 0.03 }
   return { ...base, ...overrides }
 }
 
+const skipped = { code: 0, docs: 0, web: 0, system: 0 }
+
 test("a strong look and a low invented score stay FINE", () => {
   const result = decide(
     answers({
       code_required: { noul: 0.9 },
-      code_looked: { noul: 0.81 },
       invented: { noul: 0.03 },
     }),
+    { ...skipped, code: 1 },
   )
   assert.equal(result.light, "FINE")
   assert.deepEqual(result.reasons, [])
 })
 
-test("a clear miss is definitely reprobe", () => {
-  const result = decide(
-    answers({
-      code_required: { noul: 0.9 },
-      code_looked: { noul: 0.1 },
-    }),
-  )
+test("a mandatory skip is definitely reprobe", () => {
+  const result = decide(answers({ code_required: { noul: 0.9 } }), skipped)
   assert.equal(result.light, "REPROBE")
   assert.equal(result.tone, "definitely")
   assert.deepEqual(result.reasons.map((reason) => reason.kind), ["code"])
 })
 
-test("a softer miss is probably reprobe", () => {
-  const result = decide(
-    answers({
-      code_required: { noul: 0.9 },
-      code_looked: { noul: 0.2 },
-    }),
-  )
+test("a high-weight skip is probably reprobe", () => {
+  const result = decide(answers({ code_required: { noul: 0.7 } }), skipped)
   assert.equal(result.tone, "probably")
   assert.equal(
     reportLine(result),
@@ -55,59 +46,55 @@ test("a softer miss is probably reprobe", () => {
   )
 })
 
-test("a look at 0.5 stays silent", () => {
-  const result = decide(
-    answers({
-      docs_required: { noul: 0.9 },
-      docs_looked: { noul: 0.5 },
-    }),
-  )
+test("opening the place stays silent", () => {
+  const result = decide(answers({ docs_required: { noul: 0.9 } }), { ...skipped, docs: 1 })
   assert.equal(result.light, "FINE")
 })
 
 test("a coin-flip requirement stays silent", () => {
-  const result = decide(
-    answers({
-      web_required: { noul: 0.5 },
-      web_looked: { noul: 0.0 },
-    }),
-  )
+  const result = decide(answers({ web_required: { noul: 0.5 } }), skipped)
   assert.equal(result.light, "FINE")
 })
 
 test("an optional miss stays silent", () => {
+  const result = decide(answers({ system_required: { noul: 0.2 } }), skipped)
+  assert.equal(result.light, "FINE")
+})
+
+test("needs_look off keeps a mandatory weight silent", () => {
   const result = decide(
     answers({
-      system_required: { noul: 0.2 },
-      system_looked: { noul: 0.0 },
+      needs_look: { noul: 0.1 },
+      code_required: { noul: 0.9 },
     }),
+    skipped,
   )
   assert.equal(result.light, "FINE")
 })
 
-test("invented above 0.85 is definite and above 0.5 is probable", () => {
-  const sure = decide(answers({ invented: { noul: 0.86 } }))
-  assert.equal(sure.tone, "definitely")
-  assert.equal(
-    reportLine(sure),
-    "Definitely reprobe. It put in a name or a number that isn't in what it opened.",
+test("invented alone stays silent, and never upgrades the lead", () => {
+  assert.equal(decide(answers({ invented: { noul: 0.96 } }), skipped).light, "FINE")
+  assert.equal(decide(answers({ invented: { noul: 0.7 } }), skipped).light, "FINE")
+  const withMiss = decide(
+    answers({
+      code_required: { noul: 0.7 },
+      invented: { noul: 0.96 },
+    }),
+    skipped,
   )
-  const maybe = decide(answers({ invented: { noul: 0.7 } }))
-  assert.equal(maybe.tone, "probably")
-  const edge = decide(answers({ invented: { noul: 0.5 } }))
-  assert.equal(edge.light, "FINE")
+  assert.equal(withMiss.tone, "probably")
+  assert.match(reportLine(withMiss), /^Probably reprobe\./)
+  assert.match(reportLine(withMiss), /name or a number/)
 })
 
-test("two required misses both show, and an optional miss does not", () => {
+test("two high-weight misses both show, and an optional miss does not", () => {
   const result = decide(
     answers({
       docs_required: { noul: 0.91 },
-      docs_looked: { noul: 0.1 },
       web_required: { noul: 0.8 },
-      web_looked: { noul: 0.0 },
       code_required: { noul: 0.2 },
-      code_looked: { noul: 0.0 },
     }),
+    skipped,
   )
   assert.deepEqual(
     result.reasons.map((reason) => reason.kind),
@@ -119,26 +106,16 @@ test("two required misses both show, and an optional miss does not", () => {
 })
 
 test("the session line names the folder and the place", () => {
-  const result = decide(
-    answers({
-      docs_required: { noul: 0.9 },
-      docs_looked: { noul: 0.1 },
-    }),
-  )
+  const result = decide(answers({ docs_required: { noul: 0.9 } }), skipped)
   assert.equal(
     reportLine(result),
     "Definitely reprobe. It needed the notes in the project, and it never opened them.",
   )
-  assert.equal(reportLine(decide(answers())), null)
+  assert.equal(reportLine(decide(answers(), skipped)), null)
 })
 
 test("Claude gets a title and a bell, Codex and Grok get the line only", () => {
-  const result = decide(
-    answers({
-      code_required: { noul: 0.9 },
-      code_looked: { noul: 0.1 },
-    }),
-  )
+  const result = decide(answers({ code_required: { noul: 0.9 } }), skipped)
   const claude = hookPayload(result, { cwd: "/repo/doublecheck" })
   assert.equal(
     claude.systemMessage,
@@ -151,6 +128,24 @@ test("Claude gets a title and a bell, Codex and Grok get the line only", () => {
   const grok = hookPayload(result, { cwd: "/repo/doublecheck", grok: true })
   assert.equal(grok.terminalSequence, undefined)
   assert.equal(hookPayload(decide(answers()), { cwd: "/repo/doublecheck" }), null)
+})
+
+test("a skill dump does not replace the human ask", () => {
+  const jsonl = [
+    row(
+      "user",
+      "<command-name>/orient</command-name>\n<command-args>on the folder</command-args>",
+    ),
+    row("user", "Base directory for this skill: /tmp\n# Orient\nRead the code."),
+    row("assistant", [
+      { type: "tool_use", id: "t1", name: "Read", input: { file_path: "AGENTS.md" } },
+      { type: "text", text: "done" },
+    ]),
+  ].join("\n")
+  const turn = lastTurnFromJsonl(jsonl)
+  assert.equal(turn.user, "/orient on the folder")
+  assert.match(turn.tools, /Read AGENTS.md/)
+  assert.equal(turn.answer, "done")
 })
 
 test("last user turn is the one after earlier turns", () => {

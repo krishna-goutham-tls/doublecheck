@@ -1,3 +1,5 @@
+import { lookedScore } from "./looked.mjs"
+
 export const PLACES = ["code", "docs", "web", "system"]
 
 const PROBABLY = 0.5
@@ -32,48 +34,35 @@ const SHORT = {
 }
 
 const QUESTIONS = {
+  needs_look: {
+    type: "noul",
+    instructions:
+      "Does THIS `user` prompt need any look beyond what the user already pasted or said? Score this prompt only, not the thread topic. 0 = copy edit, ELI5 of the previous answer, what-next from this session, give-me-the-path, a paste of logs or screenshots that is the evidence, chit-chat, or a new file from scratch. 1 = answering requires opening code, project notes, a live page, or a running service this turn.",
+  },
   code_required: {
     type: "noul",
     instructions:
-      "Does `user` need existing project source to answer? Yes for how this repo works. No for a new file, chit-chat, language trivia, or a fact already in the prompt.",
-  },
-  code_looked: {
-    type: "noul",
-    instructions:
-      "Did `tools` open existing project source this turn? A read of code, tests, or app config counts. A markdown read does not.",
+      "Weight for existing project source on THIS prompt only. 1 = mandatory (how this file or bug works). 0.7 = high. 0.3 = optional. 0 = not needed. No for copy edits, email drafts, ELI5, what-next, a paste of the code, a new file, or language trivia. A live-ops thread does not make code mandatory.",
   },
   docs_required: {
     type: "noul",
     instructions:
-      "Does `user` need a project markdown file to answer? Yes when the ask is about what that file says. No when the user already pasted the whole source.",
-  },
-  docs_looked: {
-    type: "noul",
-    instructions: "Did `tools` read the markdown file this ask is about?",
+      "Weight for a project markdown, LOG, STATE, transcript, or similar note on THIS prompt only. 1 = mandatory when the ask is what that file says. 0.3 = optional. 0 = not needed. No when the user already pasted the note, log, or recording.",
   },
   web_required: {
     type: "noul",
     instructions:
-      "Does `user` need a web search or the current official docs outside the repo? Yes when that page can change. No for language trivia.",
-  },
-  web_looked: {
-    type: "noul",
-    instructions: "Did `tools` search or open that live page this turn?",
+      "Weight for a current official page outside the repo on THIS prompt only. 1 = mandatory when that contract can change. 0 = not needed. No for an in-stack term, language trivia, Wikipedia, or a file on disk.",
   },
   system_required: {
     type: "noul",
     instructions:
-      "Does `user` need the current machine or a running service? Yes for env, a process, a database, or deployed config. No for the README.",
-  },
-  system_looked: {
-    type: "noul",
-    instructions:
-      "Did `tools` inspect that running state this turn? Env, a process list, curl to their service, a database read, or deployed config counts.",
+      "Weight for the current machine or a running service on THIS prompt only. 1 = mandatory for env, a process, a database, curl to their service, or a live mailbox. Files on disk (source, markdown, jsonl transcripts) are not system. No for README, a paste of logs, a screenshot, or 'sessions' as files to read.",
   },
   invented: {
     type: "noul",
     instructions:
-      "Does `answer` state a name, label, or number that `tools` does not support?",
+      "Does `answer` invent a name, label, or number that is not in `user`, `tools`, or `looked.names`? No when the name was in the prompt, the paste, a tool path, or a count taken from opened files. No for wording in an email draft. Yes only for a world fact that needed a look and is missing from the evidence.",
   },
 }
 
@@ -81,24 +70,29 @@ export function questions() {
   return QUESTIONS
 }
 
-export function decide(answers) {
+export function decide(answers, looked = {}) {
   const reasons = []
   const places = {}
+  const needs = noul(answers, "needs_look")
+  const gateOff = needs != null && !(needs > PROBABLY)
   for (const place of PLACES) {
-    const required = noul(answers, `${place}_required`)
-    const looked = noul(answers, `${place}_looked`)
-    const confidence = placeConfidence(required, looked)
+    let required = noul(answers, `${place}_required`)
+    if (gateOff && required != null) required = Math.min(required, PROBABLY)
+    const didLook = lookedScore(looked[place])
+    const confidence = placeConfidence(required, didLook)
     const tone = toneOf(confidence)
-    places[place] = { required, looked, confidence }
+    places[place] = { required, looked: didLook, confidence }
     if (tone) reasons.push({ kind: place, confidence, tone })
   }
   const invented = noul(answers, "invented")
-  const inventedConfidence = invented != null && invented > PROBABLY ? invented : 0
-  const inventedTone = toneOf(inventedConfidence)
-  if (inventedTone) reasons.push({ kind: "invented", confidence: inventedConfidence, tone: inventedTone })
-  const tone = reasons.some((reason) => reason.tone === "definitely")
+  const inventedConfidence = invented != null && invented > DEFINITELY ? invented : 0
+  if (inventedConfidence && reasons.length) {
+    reasons.push({ kind: "invented", confidence: inventedConfidence, tone: "probably" })
+  }
+  const placeMiss = reasons.filter((reason) => reason.kind !== "invented")
+  const tone = placeMiss.some((reason) => reason.tone === "definitely")
     ? "definitely"
-    : reasons.length
+    : placeMiss.length
       ? "probably"
       : null
   return {
@@ -174,9 +168,10 @@ export function claudeTerminalSequence(title) {
 }
 
 function placeConfidence(required, looked) {
-  if (required == null || looked == null) return 0
-  if (!(required > PROBABLY) || !(looked < PROBABLY)) return 0
-  return Math.min(required, 1 - looked)
+  if (required == null) return 0
+  if (!(required > PROBABLY)) return 0
+  if (looked > PROBABLY) return 0
+  return required
 }
 
 function toneOf(confidence) {

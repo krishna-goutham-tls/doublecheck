@@ -19,6 +19,7 @@ export async function install(options = {}) {
     "hook.mjs",
     "jev.mjs",
     "light.mjs",
+    "looked.mjs",
     "text.mjs",
   ]) {
     cpSync(join(packageSrc, name), join(runtimeSrc, name))

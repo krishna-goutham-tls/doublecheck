@@ -35,7 +35,7 @@ A miss above 0.85 says `Definitely reprobe.` A miss above 0.5 says `Probably rep
 
 ## What the line means
 
-A place is `code`, `docs`, `web`, or `system`. The ask marks each place required or not. A required place that was not opened prints REPROBE. An optional miss stays silent. An answer that adds a name, label, or number the tools do not support also prints REPROBE. A score near 0.5 stays silent.
+A place is `code`, `docs`, `web`, or `system`. The ask weights each place: mandatory, high, optional, or none. The tool log says whether that place was opened. A high or mandatory place that was not opened prints REPROBE. An optional miss stays silent. A name in the answer that the tools do not support can add a clause. It does not print a line on its own. A score near 0.5 stays silent.
 
 ## Check one session by hand
 
